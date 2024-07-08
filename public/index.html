@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Test Application</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+      text-align: center;
+    }
+    h1 {
+      background-color: #4CAF50;
+      color: white;
+      padding: 20px;
+      margin: 0;
+    }
+    #quiz-container, #create-question-form, #result-container {
+      background-color: white;
+      margin: 20px auto;
+      padding: 20px;
+      width: 80%;
+      max-width: 600px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+    }
+    .question {
+      margin-bottom: 20px;
+    }
+    .question p {
+      font-weight: bold;
+    }
+    label {
+      display: block;
+      margin: 5px 0;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .incorrect {
+      background-color: #ffdddd;
+    }
+    .correct {
+      background-color: #ddffdd;
+    }
+  </style>
+</head>
+<body>
+  <h1>Online Test Application</h1>
+
+  <div id="quiz-container"></div>
+  <button id="submit-btn" onclick="submitQuiz()">Submit Quiz</button>
+  <div id="result-container"></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      console.log("Fetching quiz data...");
+      fetch('http://localhost:3000/questions')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log("Quiz data received:", data);
+          renderQuiz(data);
+        })
+        .catch(error => {
+          console.error("Error fetching quiz data:", error);
+        });
+
+      document.getElementById("create-question-form").addEventListener("submit", function(event) {
+        event.preventDefault();
+        createQuestion();
+      });
+    });
+
+    function renderQuiz(data) {
+      const quizContainer = document.getElementById('quiz-container');
+      quizContainer.innerHTML = ''; // Clear existing content
+      const questions = data.quiz.questions;
+
+      questions.forEach(question => {
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question';
+        questionDiv.innerHTML = `
+          <p>${question.question}</p>
+          ${question.options.map(option => `
+            <label>
+              <input type="radio" name="question${question.id}" value="${option}">
+              ${option}
+            </label>
+          `).join('')}
+        `;
+        quizContainer.appendChild(questionDiv);
+      });
+    }
+
+    function submitQuiz() {
+      const quizContainer = document.getElementById('quiz-container');
+      const questions = quizContainer.querySelectorAll('.question');
+      const answers = {};
+
+      questions.forEach((question, index) => {
+        const selectedOption = question.querySelector('input[type="radio"]:checked');
+        if (selectedOption) {
+          answers[index + 1] = selectedOption.value;
+        }
+      });
+
+      fetch('http://localhost:3000/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ answers })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => displayResult(data.result, data.correctAnswers))
+      .catch(error => {
+        console.error("Error submitting quiz:", error);
+      });
+    }
+
+    function displayResult(result, correctAnswers) {
+      const resultContainer = document.getElementById('result-container');
+      resultContainer.innerHTML = `
+        <h2>Results</h2>
+        <p>Total Questions: ${result.totalQuestions}</p>
+        <p>Correct Answers: ${result.correctAnswers}</p>
+        <p>Score: ${result.score}</p>
+      `;
+
+      const questions = document.querySelectorAll('.question');
+      questions.forEach((question, index) => {
+        const questionId = index + 1;
+        const selectedOption = question.querySelector('input[type="radio"]:checked');
+        const correctAnswer = correctAnswers[questionId];
+        
+        if (selectedOption && selectedOption.value === correctAnswer) {
+          question.classList.add('correct');
+        } else {
+          question.classList.add('incorrect');
+          question.innerHTML += `<p>Correct Answer: ${correctAnswer}</p>`;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
